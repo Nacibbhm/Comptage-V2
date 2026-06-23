@@ -1,0 +1,33 @@
+{
+  "name": "Comptage Trafic — SCET-Tunisie",
+  "short_name": "Comptage",
+  "description": "Application de comptage de trafic terrain — SCET-Tunisie DTEM",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A1F4D",
+  "theme_color": "#0A1F4D",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Nouveau comptage",
+      "url": "./index.html",
+      "description": "Démarrer un nouveau comptage"
+    }
+  ]
+}

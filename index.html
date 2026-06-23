@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0A1F4D">
+<title>Comptage Trafic — SCET</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+/* ════════════════════════════════════════
+   RESET & BASE
+════════════════════════════════════════ */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none;font-family:-apple-system,'Segoe UI',sans-serif}
+body{background:#F4F7FF;color:#1F2937}
+
+/* ════════════════════════════════════════
+   ÉCRANS (une seule page, on affiche/cache)
+════════════════════════════════════════ */
+.ecran{display:none;min-height:100vh;flex-direction:column}
+.ecran.actif{display:flex}
+
+/* ════════════════════════════════════════
+   ÉCRAN 1 — ACCUEIL / SCAN QR
+════════════════════════════════════════ */
+#ec-accueil{background:linear-gradient(160deg,#0A1F4D 0%,#145A9E 100%);
+  align-items:center;justify-content:center;padding:32px 24px;gap:20px}
+#ec-accueil h1{color:#F7B700;font-size:24px;text-align:center}
+#ec-accueil p{color:#BFD4F2;font-size:13px;text-align:center}
+
+.card-blanc{background:rgba(255,255,255,0.1);border-radius:16px;
+  padding:20px;width:100%;max-width:360px;backdrop-filter:blur(8px)}
+.card-blanc label{display:block;color:#BFD4F2;font-size:11px;margin-bottom:6px;font-weight:600}
+.card-blanc input{width:100%;padding:12px 14px;border-radius:10px;border:none;
+  background:rgba(255,255,255,0.15);color:white;font-size:16px;outline:none;margin-bottom:4px}
+.card-blanc input::placeholder{color:rgba(255,255,255,0.4)}
+
+.btn-principal{width:100%;max-width:360px;padding:16px;background:#F7B700;
+  color:#0A1F4D;border:none;border-radius:14px;font-size:17px;font-weight:800;
+  cursor:pointer;letter-spacing:0.3px;margin-top:4px}
+.btn-principal:active{transform:scale(0.97)}
+
+.lien-code{color:#93C5FD;font-size:12px;text-align:center;cursor:pointer;
+  text-decoration:underline;margin-top:8px}
+
+/* Code mission manuel */
+#zone-code{display:none;width:100%;max-width:360px}
+#zone-code input{width:100%;padding:14px;border-radius:10px;border:2px solid rgba(255,255,255,0.3);
+  background:rgba(255,255,255,0.1);color:white;font-size:18px;text-align:center;
+  letter-spacing:4px;font-weight:700;outline:none;margin-bottom:8px}
+
+.msg-err{color:#FCA5A5;font-size:12px;text-align:center;min-height:18px}
+
+/* ════════════════════════════════════════
+   ÉCRAN 2 — FORMULAIRE DÉMARRAGE
+════════════════════════════════════════ */
+#ec-form{background:#F4F7FF}
+.form-header{background:#0A1F4D;padding:16px;display:flex;align-items:center;gap:12px}
+.form-header h2{color:#F7B700;font-size:16px;flex:1}
+.btn-retour{background:none;border:none;color:#BFD4F2;font-size:22px;cursor:pointer;padding:4px}
+
+.form-body{padding:20px;flex:1;overflow-y:auto}
+.form-section{margin-bottom:20px}
+.form-section h3{font-size:11px;font-weight:700;color:#145A9E;text-transform:uppercase;
+  letter-spacing:1px;margin-bottom:10px;padding-bottom:4px;border-bottom:2px solid #E0E7FF}
+
+.form-champ{margin-bottom:14px}
+.form-champ label{display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px}
+.form-champ input,.form-champ select{width:100%;padding:12px 14px;border-radius:10px;
+  border:1.5px solid #D1D5DB;background:white;font-size:15px;outline:none;color:#1F2937}
+.form-champ input:focus,.form-champ select:focus{border-color:#145A9E;box-shadow:0 0 0 3px rgba(20,90,158,0.1)}
+
+/* Zone photos */
+.zone-photos{background:white;border-radius:12px;border:1.5px dashed #D1D5DB;padding:16px}
+.photos-grille{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.miniature{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer}
+.btn-photo{display:flex;align-items:center;justify-content:center;gap:8px;
+  background:#E0E7FF;color:#145A9E;border:none;border-radius:10px;
+  padding:12px;width:100%;font-size:14px;font-weight:600;cursor:pointer}
+.btn-photo:active{background:#BFD4F2}
+
+.btn-demarrer-comptage{background:#F7B700;color:#0A1F4D;border:none;border-radius:14px;
+  padding:16px;width:100%;font-size:17px;font-weight:800;cursor:pointer;margin-top:8px}
+
+/* ════════════════════════════════════════
+   ÉCRAN 3 — COMPTAGE
+════════════════════════════════════════ */
+#ec-comptage{background:#F4F7FF}
+
+/* En-tête */
+.cpt-header{background:#0A1F4D;padding:10px 14px;position:sticky;top:0;z-index:50}
+.cpt-header-top{display:flex;justify-content:space-between;align-items:center}
+.cpt-header h2{color:#F7B700;font-size:14px;font-weight:700}
+.cpt-info{color:#93C5FD;font-size:11px;margin-top:1px}
+.horloge{color:#F7B700;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* Tranche */
+.tranche-bar{background:#145A9E;text-align:center;padding:5px 12px;
+  font-size:12px;color:white;font-weight:600}
+.tranche-bar span{color:#F7B700}
+
+/* Nav onglets */
+.nav-onglets{display:flex;background:#1E3A6E}
+.onglet-btn{flex:1;padding:10px 4px;border:none;background:transparent;
+  color:#BFD4F2;font-size:11px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent}
+.onglet-btn.actif{color:#F7B700;border-bottom-color:#F7B700}
+
+/* Grille véhicules */
+#panel-comptage{flex:1;overflow-y:auto}
+.grille-veh{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:12px}
+@media(min-width:480px){.grille-veh{grid-template-columns:repeat(4,1fr)}}
+
+.carte-veh{background:white;border-radius:14px;padding:10px 6px;
+  display:flex;flex-direction:column;align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;
+  border:3px solid transparent;transition:transform 0.08s;
+  user-select:none;position:relative;min-height:105px;
+  -webkit-user-select:none}
+.carte-veh:active{transform:scale(0.91)}
+.carte-veh.flash{background:#DBEAFE;border-color:#145A9E}
+
+.veh-icone{width:56px;height:44px;margin-bottom:5px;display:flex;align-items:center;justify-content:center}
+.veh-icone svg{width:100%;height:100%}
+.veh-icone img{width:100%;height:100%;object-fit:contain}
+.veh-nom{font-size:10px;font-weight:700;color:#1F2937;text-align:center;line-height:1.2}
+.veh-compteur{position:absolute;top:5px;right:7px;background:#0A1F4D;
+  color:#F7B700;font-size:13px;font-weight:800;
+  min-width:26px;height:26px;border-radius:13px;
+  display:flex;align-items:center;justify-content:center;padding:0 4px}
+.veh-groupe{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+  font-size:9px;color:#9CA3AF;font-weight:600;white-space:nowrap}
+
+/* Barre bas */
+.barre-bas{background:#0A1F4D;padding:10px 14px;
+  display:flex;justify-content:space-between;align-items:center;
+  position:sticky;bottom:0}
+.total-txt{color:white;font-size:13px}
+.total-txt strong{color:#F7B700;font-size:19px}
+.btn-annuler{background:#374151;color:white;border:none;border-radius:8px;
+  padding:8px 14px;font-size:12px;cursor:pointer}
+
+/* ── Panel Tableau ── */
+#panel-tableau{overflow-x:auto;padding:10px;display:none}
+.tbl-tranches{width:100%;border-collapse:collapse;font-size:11px;background:white;
+  border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.tbl-tranches th{background:#0A1F4D;color:#F7B700;padding:8px 5px;text-align:center;white-space:nowrap}
+.tbl-tranches td{padding:6px 5px;text-align:center;border-bottom:1px solid #F0F4FF;color:#1F2937}
+.tbl-tranches .ligne-total{background:#F0F4FF;font-weight:700}
+
+/* ── Panel Sync ── */
+#panel-sync{padding:16px;display:none;flex-direction:column;gap:14px}
+.sync-card{background:white;border-radius:14px;padding:18px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.sync-card h3{color:#0A1F4D;font-size:15px;margin-bottom:6px}
+.sync-card p{color:#6B7280;font-size:13px}
+.btn-sync{background:#10B981;color:white;border:none;border-radius:10px;
+  padding:14px;width:100%;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px}
+.btn-sync:disabled{background:#9CA3AF;cursor:not-allowed}
+.sync-statut{font-size:13px;margin-top:8px;text-align:center;min-height:18px}
+.ok{color:#10B981}.err{color:#EF4444}.warn{color:#F59E0B}
+
+.resume-ligne{display:flex;justify-content:space-between;padding:4px 0;
+  border-bottom:1px solid #F0F4FF;font-size:13px}
+.resume-ligne:last-child{border:none}
+.resume-ligne strong{color:#0A1F4D}
+
+/* ── Modal photo ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  z-index:200;align-items:center;justify-content:center}
+.modal-overlay.actif{display:flex}
+.modal-overlay img{max-width:95vw;max-height:90vh;border-radius:8px}
+.modal-fermer{position:absolute;top:16px;right:16px;background:white;
+  border:none;border-radius:50%;width:36px;height:36px;font-size:20px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* ── Barre de connexion ── */
+.barre-connexion{padding:4px 12px;font-size:11px;font-weight:600;text-align:center}
+.barre-connexion.en-ligne{background:#D1FAE5;color:#065F46}
+.barre-connexion.hors-ligne{background:#FEE2E2;color:#991B1B}
+</style>
+</head>
+<body>
+
+<!-- ══════════ ÉCRAN 1 — ACCUEIL ══════════ -->
+<div id="ec-accueil" class="ecran actif">
+  <h1>📊 Comptage Trafic</h1>
+  <p>SCET-Tunisie / DTEM — Application terrain</p>
+
+  <div class="card-blanc" id="zone-accueil">
+    <label>Code de mission (fourni par l'admin)</label>
+    <div id="zone-code" style="display:block">
+      <input type="text" id="inp-code" placeholder="EX: ABC123"
+             maxlength="20" autocomplete="off" autocapitalize="characters"
+             oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <p class="msg-err" id="msg-err-code"></p>
+  </div>
+
+  <button class="btn-principal" onclick="chargerMission()">
+    Accéder à ma mission →
+  </button>
+
+  <p style="color:#6B7280;font-size:11px;text-align:center">
+    L'app fonctionne hors ligne après le premier chargement
+  </p>
+</div>
+
+<!-- ══════════ ÉCRAN 2 — FORMULAIRE ══════════ -->
+<div id="ec-form" class="ecran">
+  <div class="form-header">
+    <button class="btn-retour" onclick="allerVers('ec-accueil')">←</button>
+    <h2 id="form-titre">Démarrer le comptage</h2>
+  </div>
+
+  <div class="form-body">
+    <!-- Infos agent -->
+    <div class="form-section">
+      <h3>👤 Informations agent</h3>
+      <div class="form-champ">
+        <label>Votre nom complet</label>
+        <input type="text" id="inp-nom" placeholder="Prénom Nom" autocomplete="name">
+      </div>
+      <div class="form-champ">
+        <label>Date du comptage</label>
+        <input type="date" id="inp-date">
+      </div>
+    </div>
+
+    <!-- Poste & Sens -->
+    <div class="form-section">
+      <h3>📍 Poste de comptage</h3>
+      <div class="form-champ">
+        <label>Poste</label>
+        <select id="inp-poste"></select>
+      </div>
+      <div class="form-champ">
+        <label>Sens de comptage</label>
+        <select id="inp-sens"></select>
+      </div>
+    </div>
+
+    <!-- Photos -->
+    <div class="form-section">
+      <h3>📷 Photos du site (optionnel)</h3>
+      <div class="zone-photos">
+        <div class="photos-grille" id="grille-photos"></div>
+        <button class="btn-photo" onclick="prendrePhoto()">
+          📷 Prendre une photo
+        </button>
+        <input type="file" id="inp-photo" accept="image/*" capture="environment"
+               style="display:none" multiple onchange="ajouterPhotos(this)">
+      </div>
+    </div>
+
+    <button class="btn-demarrer-comptage" onclick="demarrerComptage()">
+      ▶ Démarrer le comptage
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ ÉCRAN 3 — COMPTAGE ══════════ -->
+<div id="ec-comptage" class="ecran">
+
+  <div class="cpt-header">
+    <div class="cpt-header-top">
+      <div>
+        <h2 id="cpt-titre">—</h2>
+        <div class="cpt-info" id="cpt-info">—</div>
+      </div>
+      <div class="horloge" id="horloge">00:00:00</div>
+    </div>
+  </div>
+
+  <div class="barre-connexion hors-ligne" id="barre-connexion">
+    ⚠ Hors ligne — données stockées localement
+  </div>
+
+  <div class="tranche-bar">
+    Tranche : <span id="tranche-label">—</span>
+  </div>
+
+  <div class="nav-onglets">
+    <button class="onglet-btn actif" onclick="ouvrirOnglet('comptage',this)">🔢 Comptage</button>
+    <button class="onglet-btn"       onclick="ouvrirOnglet('tableau',this)">📋 Tableau</button>
+    <button class="onglet-btn"       onclick="ouvrirOnglet('sync',this)">🔄 Sync</button>
+  </div>
+
+  <!-- Panel comptage -->
+  <div id="panel-comptage">
+    <div class="grille-veh" id="grille-veh"></div>
+  </div>
+
+  <!-- Panel tableau -->
+  <div id="panel-tableau">
+    <table class="tbl-tranches" id="tbl-tranches">
+      <thead><tr id="tbl-thead"></tr></thead>
+      <tbody id="tbl-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Panel sync -->
+  <div id="panel-sync">
+    <div class="sync-card">
+      <h3>🔄 Synchroniser les données</h3>
+      <p id="sync-desc">Connectez-vous à internet puis appuyez sur Synchroniser.</p>
+      <button class="btn-sync" id="btn-sync" onclick="synchroniser()">
+        📤 Synchroniser maintenant
+      </button>
+      <div class="sync-statut" id="sync-statut"></div>
+    </div>
+
+    <div class="sync-card">
+      <h3>📊 Résumé de la session</h3>
+      <div id="resume-session"></div>
+    </div>
+
+    <div class="sync-card" style="background:#FFF7ED">
+      <h3 style="color:#92400E">⚠ Attention</h3>
+      <p style="color:#92400E;font-size:13px">
+        Ne fermez pas l'app avant d'avoir synchronisé.<br>
+        Les données sont stockées sur ce téléphone uniquement.
+      </p>
+    </div>
+  </div>
+
+  <div class="barre-bas">
+    <div class="total-txt">Total : <strong id="total-nb">0</strong> véh.</div>
+    <button class="btn-annuler" onclick="annulerDernier()">↩ Annuler</button>
+  </div>
+</div>
+
+<!-- Modal photo agrandie -->
+<div class="modal-overlay" id="modal-photo">
+  <button class="modal-fermer" onclick="fermerModal()">✕</button>
+  <img id="modal-img" src="" alt="">
+</div>
+
+<!-- Input caché pour capture caméra -->
+<canvas id="canvas-compression" style="display:none"></canvas>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//   CONFIGURATION — À MODIFIER AVEC TON URL RENDER
+// ════════════════════════════════════════════════════════════
+const SERVEUR_URL = "https://comptage-v2.onrender.com";
+
+// ════════════════════════════════════════════════════════════
+//   ÉTAT GLOBAL
+// ════════════════════════════════════════════════════════════
+let MISSION   = null;   // config complète reçue du serveur
+let SESSION   = null;   // {poste_id, poste_nom, sens, agent_nom, date_jour}
+let CLICS     = [];     // [{cat_id, horodatage, annule:0/1}]
+let COMPTEURS = {};     // {cat_id: nombre}
+let PHOTOS    = [];     // [{data_url, nom}]
+let EN_LIGNE  = navigator.onLine;
+
+// ════════════════════════════════════════════════════════════
+//   NAVIGATION ENTRE ÉCRANS
+// ════════════════════════════════════════════════════════════
+function allerVers(id) {
+  document.querySelectorAll('.ecran').forEach(e => e.classList.remove('actif'));
+  document.getElementById(id).classList.add('actif');
+  window.scrollTo(0,0);
+}
+
+// ════════════════════════════════════════════════════════════
+//   CHARGEMENT DE LA MISSION (via code)
+// ════════════════════════════════════════════════════════════
+async function chargerMission() {
+  const code = document.getElementById('inp-code').value.trim().toUpperCase();
+  const errEl = document.getElementById('msg-err-code');
+
+  if (!code || code.length < 4) {
+    errEl.textContent = "Entrez le code fourni par votre responsable.";
+    return;
+  }
+
+  errEl.textContent = "Chargement…";
+
+  // 1. Chercher dans le cache local d'abord
+  const cacheKey = `mission_${code}`;
+  const cached   = localStorage.getItem(cacheKey);
+
+  try {
+    // Essayer le serveur si en ligne
+    if (navigator.onLine) {
+      const resp = await fetch(`${SERVEUR_URL}/api/mission/${code}`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!resp.ok) throw new Error("Code invalide");
+      MISSION = await resp.json();
+      localStorage.setItem(cacheKey, JSON.stringify(MISSION));
+      localStorage.setItem('dernier_code', code);
+    } else if (cached) {
+      MISSION = JSON.parse(cached);
+    } else {
+      errEl.textContent = "Hors ligne et mission inconnue. Connectez-vous une première fois.";
+      return;
+    }
+
+    errEl.textContent = "";
+    preparerFormulaire();
+    allerVers('ec-form');
+
+  } catch(e) {
+    if (cached) {
+      MISSION = JSON.parse(cached);
+      errEl.textContent = "⚠ Mode hors ligne — config locale utilisée";
+      preparerFormulaire();
+      allerVers('ec-form');
+    } else {
+      errEl.textContent = "Code invalide ou connexion impossible.";
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//   FORMULAIRE DE DÉMARRAGE
+// ════════════════════════════════════════════════════════════
+function preparerFormulaire() {
+  document.getElementById('form-titre').textContent =
+    MISSION.nom || "Démarrer le comptage";
+
+  // Date du jour
+  document.getElementById('inp-date').value =
+    new Date().toISOString().slice(0,10);
+
+  // Peupler les postes
+  const selPoste = document.getElementById('inp-poste');
+  selPoste.innerHTML = '';
+  (MISSION.postes || []).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.nom} — ${p.localisation || ''}`;
+    opt.dataset.sens1 = p.sens1_label;
+    opt.dataset.sens2 = p.sens2_label;
+    selPoste.appendChild(opt);
+  });
+
+  // Mettre à jour les sens quand on change de poste
+  selPoste.onchange = () => remplirSens();
+  remplirSens();
+}
+
+function remplirSens() {
+  const selPoste = document.getElementById('inp-poste');
+  const selSens  = document.getElementById('inp-sens');
+  const opt = selPoste.options[selPoste.selectedIndex];
+  if (!opt) return;
+  selSens.innerHTML = `
+    <option value="1">${opt.dataset.sens1 || 'Sens 1'}</option>
+    <option value="2">${opt.dataset.sens2 || 'Sens 2'}</option>`;
+}
+
+// ─── Photos ───────────────────────────────────────────────
+function prendrePhoto() {
+  document.getElementById('inp-photo').click();
+}
+
+async function ajouterPhotos(input) {
+  for (const file of input.files) {
+    const compressed = await compresserImage(file, 800);
+    PHOTOS.push({ data_url: compressed, nom: file.name });
+    afficherMiniature(compressed);
+  }
+  input.value = '';
+}
+
+function afficherMiniature(dataUrl) {
+  const grille = document.getElementById('grille-photos');
+  const img = document.createElement('img');
+  img.className = 'miniature';
+  img.src = dataUrl;
+  img.onclick = () => {
+    document.getElementById('modal-img').src = dataUrl;
+    document.getElementById('modal-photo').classList.add('actif');
+  };
+  grille.appendChild(img);
+}
+
+function fermerModal() {
+  document.getElementById('modal-photo').classList.remove('actif');
+}
+
+async function compresserImage(file, maxWidth) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('canvas-compression');
+        const ratio  = Math.min(maxWidth / img.width, 1);
+        canvas.width  = img.width  * ratio;
+        canvas.height = img.height * ratio;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//   DÉMARRER LE COMPTAGE
+// ════════════════════════════════════════════════════════════
+function demarrerComptage() {
+  const nom  = document.getElementById('inp-nom').value.trim();
+  const date = document.getElementById('inp-date').value;
+  const selPoste = document.getElementById('inp-poste');
+  const selSens  = document.getElementById('inp-sens');
+
+  if (!nom)  { alert('Veuillez entrer votre nom.'); return; }
+  if (!date) { alert('Veuillez choisir une date.'); return; }
+
+  const postOpt = selPoste.options[selPoste.selectedIndex];
+  SESSION = {
+    code_mission: localStorage.getItem('dernier_code'),
+    poste_id:     selPoste.value,
+    poste_nom:    postOpt ? postOpt.text.split('—')[0].trim() : '—',
+    sens:         parseInt(selSens.value),
+    sens_label:   selSens.options[selSens.selectedIndex]?.text || 'Sens 1',
+    agent_nom:    nom,
+    date_jour:    date,
+    debut:        new Date().toISOString(),
+  };
+
+  // Charger clics existants depuis le cache
+  const clicsSauv = localStorage.getItem(`clics_${SESSION.code_mission}_${SESSION.poste_id}_${SESSION.sens}_${SESSION.date_jour}`);
+  CLICS = clicsSauv ? JSON.parse(clicsSauv) : [];
+
+  // Initialiser compteurs
+  COMPTEURS = {};
+  (MISSION.categories || []).forEach(c => { COMPTEURS[c.id] = 0; });
+  CLICS.filter(c => !c.annule).forEach(c => {
+    COMPTEURS[c.cat_id] = (COMPTEURS[c.cat_id] || 0) + 1;
+  });
+
+  construireGrille();
+  mettreAJourEnTete();
+  ouvrirOnglet('comptage', document.querySelector('.onglet-btn'));
+  allerVers('ec-comptage');
+  demarrerHorloge();
+  verifierConnexion();
+}
+
+// ════════════════════════════════════════════════════════════
+//   INTERFACE COMPTAGE
+// ════════════════════════════════════════════════════════════
+function mettreAJourEnTete() {
+  document.getElementById('cpt-titre').textContent =
+    `${SESSION.poste_nom} — ${SESSION.sens_label}`;
+  document.getElementById('cpt-info').textContent =
+    `${SESSION.agent_nom}  •  ${SESSION.date_jour}  •  ${MISSION.nom || ''}`;
+}
+
+function construireGrille() {
+  const grille = document.getElementById('grille-veh');
+  grille.innerHTML = '';
+
+  (MISSION.categories || []).forEach(cat => {
+    const carte = document.createElement('div');
+    carte.className = 'carte-veh';
+    carte.id = `carte-${cat.id}`;
+
+    // Icône SVG par groupe si pas d'icône custom
+    const svgIcon = cat.icone_svg || iconeParGroupe(cat.groupe, cat.couleur || '#145A9E');
+
+    carte.innerHTML = `
+      <div class="veh-icone">${svgIcon}</div>
+      <div class="veh-nom">${cat.nom_court || cat.nom}</div>
+      <div class="veh-compteur" id="cpt-${cat.id}">${COMPTEURS[cat.id] || 0}</div>
+      <div class="veh-groupe" style="color:${cat.couleur || '#9CA3AF'}">${cat.groupe}</div>`;
+
+    // Clic = +1
+    carte.addEventListener('click', () => enregistrerClic(cat.id));
+
+    // Appui long (600ms) = annuler dernier de ce type
+    let timer;
+    carte.addEventListener('pointerdown', () => {
+      timer = setTimeout(() => {
+        annulerDernierDe(cat.id);
+        if (navigator.vibrate) navigator.vibrate([30,30,30]);
+      }, 600);
+    });
+    ['pointerup','pointerleave','pointercancel'].forEach(ev =>
+      carte.addEventListener(ev, () => clearTimeout(timer))
+    );
+
+    grille.appendChild(carte);
+  });
+}
+
+function iconeParGroupe(groupe, couleur) {
+  const icons = {
+    VL: `<svg viewBox="0 0 64 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="12" width="56" height="20" rx="4" fill="${couleur}"/>
+      <rect x="10" y="6" width="36" height="14" rx="3" fill="${couleur}" opacity="0.7"/>
+      <circle cx="16" cy="34" r="6" fill="#374151"/>
+      <circle cx="16" cy="34" r="3" fill="#9CA3AF"/>
+      <circle cx="48" cy="34" r="6" fill="#374151"/>
+      <circle cx="48" cy="34" r="3" fill="#9CA3AF"/>
+    </svg>`,
+    PL: `<svg viewBox="0 0 64 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="8" width="52" height="24" rx="3" fill="${couleur}"/>
+      <rect x="54" y="14" width="8" height="14" rx="2" fill="${couleur}" opacity="0.8"/>
+      <rect x="4" y="10" width="20" height="12" rx="2" fill="white" opacity="0.2"/>
+      <circle cx="12" cy="34" r="6" fill="#374151"/>
+      <circle cx="12" cy="34" r="3" fill="#9CA3AF"/>
+      <circle cx="38" cy="34" r="6" fill="#374151"/>
+      <circle cx="38" cy="34" r="3" fill="#9CA3AF"/>
+      <circle cx="52" cy="34" r="6" fill="#374151"/>
+      <circle cx="52" cy="34" r="3" fill="#9CA3AF"/>
+    </svg>`,
+    '2R': `<svg viewBox="0 0 64 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="32" r="10" stroke="${couleur}" stroke-width="3" fill="none"/>
+      <circle cx="50" cy="32" r="10" stroke="${couleur}" stroke-width="3" fill="none"/>
+      <circle cx="14" cy="32" r="4" fill="${couleur}"/>
+      <circle cx="50" cy="32" r="4" fill="${couleur}"/>
+      <path d="M14 32 L32 14 L50 32" stroke="${couleur}" stroke-width="3" stroke-linecap="round"/>
+      <path d="M32 14 L32 6 L38 10" stroke="${couleur}" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>`,
+    NM: `<svg viewBox="0 0 64 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="34" r="9" stroke="${couleur}" stroke-width="3" fill="none"/>
+      <circle cx="50" cy="34" r="9" stroke="${couleur}" stroke-width="3" fill="none"/>
+      <path d="M14 34 L28 20 L50 34" stroke="${couleur}" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="32" cy="10" r="5" fill="${couleur}"/>
+      <path d="M32 15 L32 26" stroke="${couleur}" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>`,
+  };
+  return icons[groupe] || icons['VL'];
+}
+
+// ════════════════════════════════════════════════════════════
+//   ENREGISTREMENT CLIC
+// ════════════════════════════════════════════════════════════
+function enregistrerClic(catId) {
+  const horodatage = new Date().toISOString();
+  COMPTEURS[catId] = (COMPTEURS[catId] || 0) + 1;
+
+  CLICS.push({ cat_id: catId, horodatage, annule: 0 });
+  sauvegarderClics();
+
+  // Mise à jour compteur sur la carte
+  const cptEl = document.getElementById(`cpt-${catId}`);
+  if (cptEl) cptEl.textContent = COMPTEURS[catId];
+
+  // Flash visuel
+  const carte = document.getElementById(`carte-${catId}`);
+  if (carte) {
+    carte.classList.add('flash');
+    setTimeout(() => carte.classList.remove('flash'), 180);
+  }
+
+  // Vibration légère
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  mettreAJourTotal();
+}
+
+function annulerDernier() {
+  for (let i = CLICS.length - 1; i >= 0; i--) {
+    if (!CLICS[i].annule) {
+      const catId = CLICS[i].cat_id;
+      CLICS[i].annule = 1;
+      COMPTEURS[catId] = Math.max(0, (COMPTEURS[catId] || 1) - 1);
+      sauvegarderClics();
+      const cptEl = document.getElementById(`cpt-${catId}`);
+      if (cptEl) cptEl.textContent = COMPTEURS[catId];
+      if (navigator.vibrate) navigator.vibrate(50);
+      mettreAJourTotal();
+      break;
+    }
+  }
+}
+
+function annulerDernierDe(catId) {
+  for (let i = CLICS.length - 1; i >= 0; i--) {
+    if (!CLICS[i].annule && CLICS[i].cat_id === catId) {
+      CLICS[i].annule = 1;
+      COMPTEURS[catId] = Math.max(0, (COMPTEURS[catId] || 1) - 1);
+      sauvegarderClics();
+      const cptEl = document.getElementById(`cpt-${catId}`);
+      if (cptEl) cptEl.textContent = COMPTEURS[catId];
+      mettreAJourTotal();
+      break;
+    }
+  }
+}
+
+function sauvegarderClics() {
+  const key = `clics_${SESSION.code_mission}_${SESSION.poste_id}_${SESSION.sens}_${SESSION.date_jour}`;
+  localStorage.setItem(key, JSON.stringify(CLICS));
+}
+
+function mettreAJourTotal() {
+  const tot = CLICS.filter(c => !c.annule).length;
+  document.getElementById('total-nb').textContent = tot;
+}
+
+// ════════════════════════════════════════════════════════════
+//   HORLOGE ET TRANCHE
+// ════════════════════════════════════════════════════════════
+let _horlogeTimer = null;
+function demarrerHorloge() {
+  if (_horlogeTimer) clearInterval(_horlogeTimer);
+  const tick = () => {
+    const now = new Date();
+    document.getElementById('horloge').textContent = now.toTimeString().slice(0,8);
+    mettreAJourTranche(now);
+  };
+  tick();
+  _horlogeTimer = setInterval(tick, 1000);
+}
+
+function mettreAJourTranche(now) {
+  if (!MISSION) return;
+  const iv   = MISSION.config?.intervalle_min || 60;
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const tNum = Math.floor(mins / iv);
+  const hD   = tNum * iv;
+  const hF   = hD + iv;
+  const pad  = n => String(Math.floor(n)).padStart(2,'0');
+  document.getElementById('tranche-label').textContent =
+    `${pad(hD/60)}:${pad(hD%60)} – ${pad(hF/60)}:${pad(hF%60)}`;
+}
+
+// ════════════════════════════════════════════════════════════
+//   ONGLETS
+// ════════════════════════════════════════════════════════════
+function ouvrirOnglet(nom, btn) {
+  ['comptage','tableau','sync'].forEach(p => {
+    const el = document.getElementById(`panel-${p}`);
+    el.style.display = p === nom ? (p === 'sync' ? 'flex' : 'block') : 'none';
+  });
+  document.querySelectorAll('.onglet-btn').forEach(b => b.classList.remove('actif'));
+  if (btn) btn.classList.add('actif');
+  if (nom === 'tableau') construireTableau();
+  if (nom === 'sync')    construireResume();
+}
+
+// ════════════════════════════════════════════════════════════
+//   TABLEAU PAR TRANCHES
+// ════════════════════════════════════════════════════════════
+function construireTableau() {
+  const iv   = MISSION.config?.intervalle_min || 60;
+  const cats = MISSION.categories || [];
+  const clicsActifs = CLICS.filter(c => !c.annule);
+
+  // Grouper
+  const tranches = {};
+  clicsActifs.forEach(c => {
+    const dt   = new Date(c.horodatage);
+    const mins = dt.getHours() * 60 + dt.getMinutes();
+    const tNum = Math.floor(mins / iv);
+    const hD   = tNum * iv;
+    const hF   = hD + iv;
+    const pad  = n => String(Math.floor(n)).padStart(2,'0');
+    const key  = `${pad(hD/60)}:${pad(hD%60)}–${pad(hF/60)}:${pad(hF%60)}`;
+    if (!tranches[key]) tranches[key] = {};
+    tranches[key][c.cat_id] = (tranches[key][c.cat_id] || 0) + 1;
+  });
+
+  // En-tête
+  const thead = document.getElementById('tbl-thead');
+  thead.innerHTML = '<th>Tranche</th>' +
+    cats.map(c => `<th>${c.nom_court || c.nom}</th>`).join('') +
+    '<th>Total</th>';
+
+  // Corps
+  const tbody = document.getElementById('tbl-tbody');
+  tbody.innerHTML = '';
+  const totaux = {};
+
+  Object.entries(tranches).sort().forEach(([tr, counts]) => {
+    let tot = 0;
+    let row = `<tr><td><b>${tr}</b></td>`;
+    cats.forEach(c => {
+      const v = counts[c.id] || 0;
+      tot += v;
+      totaux[c.id] = (totaux[c.id] || 0) + v;
+      row += `<td>${v || ''}</td>`;
+    });
+    row += `<td><b>${tot}</b></td></tr>`;
+    tbody.innerHTML += row;
+  });
+
+  // Total général
+  let totRow = '<tr class="ligne-total"><td>TOTAL</td>';
+  let grand  = 0;
+  cats.forEach(c => {
+    const v = totaux[c.id] || 0;
+    grand += v;
+    totRow += `<td>${v || '-'}</td>`;
+  });
+  tbody.innerHTML += totRow + `<td>${grand}</td></tr>`;
+}
+
+// ════════════════════════════════════════════════════════════
+//   RÉSUMÉ SESSION
+// ════════════════════════════════════════════════════════════
+function construireResume() {
+  if (!SESSION || !MISSION) return;
+  const clicsActifs = CLICS.filter(c => !c.annule);
+  const resume = document.getElementById('resume-session');
+
+  const lignes = [
+    ['Agent',   SESSION.agent_nom],
+    ['Date',    SESSION.date_jour],
+    ['Poste',   SESSION.poste_nom],
+    ['Sens',    SESSION.sens_label],
+    ['Total véhicules', `<strong>${clicsActifs.length}</strong>`],
+  ];
+
+  resume.innerHTML = lignes.map(([k,v]) =>
+    `<div class="resume-ligne"><span>${k}</span><span>${v}</span></div>`
+  ).join('');
+
+  // Détail par catégorie
+  const cats = MISSION.categories || [];
+  cats.forEach(c => {
+    const n = clicsActifs.filter(x => x.cat_id === c.id).length;
+    if (n > 0) {
+      resume.innerHTML +=
+        `<div class="resume-ligne"><span>• ${c.nom_court || c.nom}</span><strong>${n}</strong></div>`;
+    }
+  });
+
+  document.getElementById('sync-desc').textContent =
+    `${clicsActifs.length} clic(s) à synchroniser.`;
+}
+
+// ════════════════════════════════════════════════════════════
+//   SYNCHRONISATION
+// ════════════════════════════════════════════════════════════
+async function synchroniser() {
+  const btn = document.getElementById('btn-sync');
+  const st  = document.getElementById('sync-statut');
+  btn.disabled = true;
+  btn.textContent = '⏳ Synchronisation…';
+  st.className = 'sync-statut';
+  st.textContent = '';
+
+  try {
+    // Test ping
+    await fetch(`${SERVEUR_URL}/api/ping`, { signal: AbortSignal.timeout(4000) });
+
+    const clicsActifs = CLICS.filter(c => !c.annule);
+    const payload = {
+      session: SESSION,
+      clics:   clicsActifs,
+      photos:  PHOTOS.map(p => ({ nom: p.nom, data: p.data_url })),
+    };
+
+    const resp = await fetch(`${SERVEUR_URL}/api/sync`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+
+    if (!resp.ok) throw new Error(`Erreur serveur ${resp.status}`);
+    const data = await resp.json();
+
+    st.className = 'sync-statut ok';
+    st.textContent = `✅ ${data.message} — ${new Date().toLocaleTimeString('fr')}`;
+
+    // Marquer comme synchronisé (ne pas effacer — l'agent peut recliquer)
+    SESSION.synchro_le = new Date().toISOString();
+
+  } catch(e) {
+    st.className = 'sync-statut err';
+    st.textContent = `❌ Échec : ${e.message}. Données conservées.`;
+  }
+
+  btn.disabled  = false;
+  btn.textContent = '📤 Synchroniser maintenant';
+}
+
+// ════════════════════════════════════════════════════════════
+//   CONNEXION INTERNET
+// ════════════════════════════════════════════════════════════
+function verifierConnexion() {
+  const barre = document.getElementById('barre-connexion');
+  const update = () => {
+    EN_LIGNE = navigator.onLine;
+    barre.className = `barre-connexion ${EN_LIGNE ? 'en-ligne' : 'hors-ligne'}`;
+    barre.textContent = EN_LIGNE
+      ? '✅ En ligne — synchronisation disponible'
+      : '⚠ Hors ligne — données stockées localement';
+  };
+  window.addEventListener('online',  update);
+  window.addEventListener('offline', update);
+  update();
+}
+
+// ════════════════════════════════════════════════════════════
+//   INITIALISATION
+// ════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  // Enregistrer le Service Worker pour le mode hors ligne
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+
+  // Lire le code depuis l'URL (?code=XXXX) — QR code automatique
+  const params    = new URLSearchParams(window.location.search);
+  const codeURL   = params.get('code');
+  const dernierCode = localStorage.getItem('dernier_code');
+
+  if (codeURL) {
+    // Code dans l'URL → charger la mission automatiquement
+    document.getElementById('inp-code').value = codeURL;
+    chargerMissionAuto(codeURL);
+  } else if (dernierCode) {
+    // Pas de code dans l'URL → pré-remplir avec le dernier utilisé
+    document.getElementById('inp-code').value = dernierCode;
+  }
+});
+
+async function chargerMissionAuto(code) {
+  // Afficher un écran de chargement
+  const accueil = document.getElementById('ec-accueil');
+  accueil.innerHTML = `
+    <div style="text-align:center;color:white">
+      <div style="font-size:48px;margin-bottom:16px">📊</div>
+      <h1 style="color:#F7B700;margin-bottom:8px">Chargement…</h1>
+      <p style="color:#BFD4F2">Mission : ${code}</p>
+      <p style="color:#93C5FD;font-size:12px;margin-top:8px">Connexion au serveur…</p>
+    </div>`;
+
+  const errEl = document.getElementById('msg-err-code') || document.createElement('p');
+  const cacheKey = `mission_${code}`;
+  const cached   = localStorage.getItem(cacheKey);
+
+  try {
+    if (navigator.onLine) {
+      const resp = await fetch(`${SERVEUR_URL}/api/mission/${code}`, {
+        signal: AbortSignal.timeout(6000)
+      });
+      if (!resp.ok) throw new Error("Code invalide");
+      MISSION = await resp.json();
+      localStorage.setItem(cacheKey, JSON.stringify(MISSION));
+      localStorage.setItem('dernier_code', code);
+    } else if (cached) {
+      MISSION = JSON.parse(cached);
+    } else {
+      // Hors ligne et pas de cache → montrer le formulaire manuel
+      _restaurerAccueil(code);
+      return;
+    }
+
+    preparerFormulaire();
+    allerVers('ec-form');
+
+  } catch(e) {
+    if (cached) {
+      MISSION = JSON.parse(cached);
+      preparerFormulaire();
+      allerVers('ec-form');
+    } else {
+      _restaurerAccueil(code);
+    }
+  }
+}
+
+function _restaurerAccueil(code) {
+  // Reconstruire l'écran d'accueil si le chargement auto échoue
+  document.getElementById('ec-accueil').innerHTML = `
+    <h1>📊 Comptage Trafic</h1>
+    <p>SCET-Tunisie / DTEM — Application terrain</p>
+    <div class="card-blanc">
+      <label>Code de mission</label>
+      <div id="zone-code" style="display:block">
+        <input type="text" id="inp-code" placeholder="EX: ABC123"
+               maxlength="20" autocomplete="off" value="${code}"
+               oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <p class="msg-err" id="msg-err-code">⚠ Connexion impossible. Vérifiez internet.</p>
+    </div>
+    <button class="btn-principal" onclick="chargerMission()">
+      Réessayer →
+    </button>
+    <p style="color:#6B7280;font-size:11px;text-align:center">
+      L'app fonctionne hors ligne après le premier chargement
+    </p>`;
+}
+</script>
+</body>
+</html>
